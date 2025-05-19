@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Next Buses</title>
+  <meta charset="UTF-8" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&family=Signika:wght@300..700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="static/main.css">
+</head>
+<body>
+
+  <div class="row">
+    <div class="column">
+      <h1>Next Departures</h1>
+      <p><span id="last-updated">{{ last_updated }}</span></p>
+    </div>
+    <div class="column">
+      <img class="logo" src="static/translink.svg" alt="TransLink">
+    </div>
+  </div>
+
+  <table>
+    <tbody id="bus-table-body">
+      <!-- Rows will be inserted here -->
+    </tbody>
+  </table>
+
+<script>
+  let allData = [];
+  let showAlternate = false;
+  let countdown = 30; // countdown starts at 30
+
+  async function fetchDataFromAPI() {
+    try {
+      const response = await fetch("/data");
+      const data = await response.json();
+
+      // Handle API error from backend
+      if (data.error) {
+        console.error("API error:", data.error);
+        document.getElementById("bus-table-body").innerHTML = `
+          <tr><td colspan="5">Error: ${data.error}</td></tr>
+        `;
+        return;
+      }
+
+      // Handle empty departures
+      if (!data.departures || data.departures.length === 0) {
+        console.warn("No departures received.");
+        document.getElementById("bus-table-body").innerHTML = `
+          <tr><td colspan="5">No departures available.</td></tr>
+        `;
+        return;
+      }
+
+      // Store data and update last-updated timestamp
+      allData = data.departures;
+      document.getElementById("last-updated").textContent = data.last_updated;
+
+      // Now safe to update the table
+      updateTable();
+
+    } catch (err) {
+      console.error("Fetch failed:", err);
+      document.getElementById("bus-table-body").innerHTML = `
+        <tr><td colspan="5">Failed to fetch data from server.</td></tr>
+      `;
+    }
+  }
+
+
+
+  function updateTable() {
+    const tbody = document.getElementById("bus-table-body");
+    tbody.innerHTML = "";
+
+    const filtered = allData.filter(entry => {
+      const dir = entry.stop;
+
+      // eastbound / northbound on first view
+      if (!showAlternate) {
+        return dir.includes("Eastbound") || dir.includes("Northbound");
+      }
+
+      // westbound / southbound on second view
+      return dir.includes("Westbound") || dir.includes("Southbound");
+    });
+
+
+    filtered.forEach(entry => {
+      const row = document.createElement("tr");
+
+      const isCancelled = entry.times.some(t => t.cancelled);
+      if (isCancelled) row.classList.add("cancelled");
+
+      let html = `
+        <td class="route">${entry.route}</td>
+        <td class="direction">${entry.direction}</td>
+      `;
+
+      entry.times.forEach(t => {
+        // Format time (remove seconds)
+        let timeDisplay = t.time;
+
+        if (t.real_time) {
+          timeDisplay = `<span class="realtime">${timeDisplay}<img class="rt-icon" src="static/realtime.svg"></span>`;
+        }
+
+        if (t.cancelled) {
+          timeDisplay = `<span class="cancelled-text">${timeDisplay}</span>`;
+        }
+
+        html += `<td class="time">${timeDisplay}</td>`;
+      });
+
+      row.innerHTML = html;
+      tbody.appendChild(row);
+    });
+  }
+
+  // INITIAL DATA FETCH
+  fetchDataFromAPI();
+
+  // Update API data every 30 seconds
+  setInterval(fetchDataFromAPI, 30000);
+
+  // Toggle direction view every 30 seconds
+  setInterval(() => {
+    showAlternate = !showAlternate;
+    countdown = 30;  // reset countdown
+    updateTable();
+  }, 30000);
+</script>
+
+</body>
+</html>

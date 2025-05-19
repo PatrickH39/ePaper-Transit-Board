@@ -1,0 +1,96 @@
+* {
+	box-sizing: border-box;
+}
+
+body {
+	font-family: Lato, sans-serif;
+	padding: 10px 20px 10px 20px;
+}
+
+h1 {
+	margin-bottom: 5px;
+}
+
+p {
+	margin-top: 0;
+	font-size: 0.9em;
+	color: #555;
+}
+
+img {
+	-webkit-user-select: none;
+	-khtml-user-select: none;
+	-moz-user-select: none;
+	-o-user-select: none;
+	user-select: none;
+}
+
+table {
+	width: 100%;
+	border-collapse: collapse;
+	margin-top: 15px;
+}
+
+th,
+td {
+	border-bottom: 2px solid #ddd;
+	padding: 20px 10px 20px 10px;
+	font-size: 1.75rem;
+	text-align: center;
+}
+
+.realtime {
+	display: inline-block;
+	position: relative;
+	color: green;
+	font-weight: bold;
+}
+
+.cancelled-text {
+	text-decoration: line-through;
+	color: #a00;
+}
+
+.rt-icon {
+	position: absolute;
+	top: 0;
+	right: -1rem;
+	width: 14px;
+	height: 14px;
+}
+
+.route {
+	font-weight: 700;
+	font-size: 2rem;
+}
+
+.direction {
+	min-width: 350px;
+	font-size: 2rem;
+	text-align: left;
+	padding-left: 28px
+}
+
+.time {
+	padding: 20px 10px 20px 10px;
+	min-width: 165px;
+}
+
+.time:last-child {
+	padding: 20px 0px 20px 10px;
+}
+
+.row {
+	display: flex;
+}
+
+.column {
+	flex: 50%;
+}
+
+.logo {
+	width: 144px;
+	height: 63px;
+	margin-top: 21.44px;
+	float: right;
+}

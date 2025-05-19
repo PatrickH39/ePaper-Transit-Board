@@ -1,7 +1,7 @@
 from flask import Flask, render_template, jsonify
 from dotenv import load_dotenv
 from zoneinfo import ZoneInfo
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from time import time
 import requests
 import os
@@ -9,7 +9,9 @@ import re
 from collections import defaultdict
 
 # Initialize Flask
-app = Flask(__name__)
+app = Flask(__name__,
+            static_folder='web/static',
+            template_folder='web/templates')
 
 # Load .env
 load_dotenv()
@@ -17,11 +19,16 @@ load_dotenv()
 # Globals
 cached_data = None
 last_fetch_time = 0
-FETCH_INTERVAL = 30  # seconds
+FETCH_INTERVAL = 61  # seconds
 pst = ZoneInfo("America/Vancouver")
 
 # API Config
-API_URL = "https://external.transitapp.com/v3/public/nearby_routes?lat=49.224833&lon=-123.054777&max_distance=1000"
+API_URLS = [
+    "https://external.transitapp.com/v3/public/nearby_routes?lat=49.224833&lon=-123.054777&max_distance=1000",
+    "https://external.transitapp.com/v3/public/nearby_routes?lat=49.22015&lon=-123.06579",
+    "https://external.transitapp.com/v3/public/nearby_routes?lat=49.21870&lon=-123.05440"
+]
+
 api_key = os.getenv("TRANSIT_API_KEY")
 HEADERS = {"apiKey": api_key}
 
@@ -29,10 +36,12 @@ HEADERS = {"apiKey": api_key}
 TARGETS = {
     "TSL:72887": ["49", "430"],
     "TSL:72919": ["49", "430"],
-    "TSL:72752": ["R4", "41"],
-    "TSL:72772": ["R4", "41"],
-    "TSL:71932": ["20", "N20"],
+    "TSL:72752": ["R4"],
+    "TSL:72772": ["R4"],
+    "TSL:71930": ["20", "N20"],
     "TSL:72028": ["20", "N20"],
+    "TSL:72554": ["29"],
+    "TSL:72583": ["29"],
 }
 
 @app.route("/")
@@ -47,15 +56,23 @@ def get_data():
 
         now = time()
         if cached_data is None or now - last_fetch_time > FETCH_INTERVAL:
-            response = requests.get(API_URL, headers=HEADERS)
-            if response.status_code == 200:
-                cached_data = response.json()
+            all_routes = []
+
+            for url in API_URLS:
+                response = requests.get(url, headers=HEADERS)
+                if response.status_code == 200:
+                    data = response.json()
+                    all_routes.extend(data.get("routes", []))
+                else:
+                    print(f"Failed to fetch {url} — Status Code: {response.status_code}")
+
+            if all_routes:
+                cached_data = all_routes
                 last_fetch_time = now
             else:
-                return jsonify({"error": "API error"}), 500
+                return jsonify({"error": "No valid API responses"}), 500
 
-        data = cached_data
-        routes = data.get("routes", [])
+        routes = cached_data
         grouped = defaultdict(list)
 
         for route in routes:
@@ -70,8 +87,20 @@ def get_data():
 
                     for item in schedule_items:
                         departure_ts = item.get("departure_time")
+
                         if departure_ts:
-                            readable_time = datetime.fromtimestamp(departure_ts, tz=pst).strftime("%H:%M")
+                            dep_time = datetime.fromtimestamp(departure_ts, tz=pst)
+                            now = datetime.now(pst)
+                            delta = dep_time - now
+                            minutes = int(delta.total_seconds() / 60)
+
+                            if 0 <= minutes < 60:
+                                if minutes == 0:
+                                    readable_time = f"Now"
+                                else:
+                                    readable_time = f"{minutes} min"
+                            else:
+                                readable_time = dep_time.strftime("%I:%M %p")
                         else:
                             readable_time = "-"
 
@@ -102,7 +131,10 @@ def get_data():
 
         output.sort(key=sort_key)
 
-        return jsonify(output)
+        return jsonify({
+            "departures": output,
+            "last_updated": datetime.fromtimestamp(last_fetch_time, tz=pst).strftime("%I:%M:%S %p")
+        })
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
